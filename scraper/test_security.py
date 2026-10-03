@@ -1,9 +1,12 @@
 import asyncio
+import json
+import os
 
 import httpx
 import pytest
 from pydantic import ValidationError
 
+import database
 from models import JobPosting, is_internship, is_long_term
 from scraper import MAX_BYTES, LeverScraper, make_client
 
@@ -132,3 +135,95 @@ def test_lever_does_not_follow_redirects():
 def test_rejects_bad_slugs(slug):
     with pytest.raises(ValueError):
         LeverScraper(None, slug, "X")
+
+
+# --- Veritabanı yazma ---
+
+def run_upsert(handler, jobs):
+    async def go():
+        async with make_client(httpx.MockTransport(handler)) as c:
+            return await database.upsert_jobs(c, jobs)
+    return asyncio.run(go())
+
+
+@pytest.fixture
+def supabase_env(monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
+    monkeypatch.setenv("SUPABASE_SECRET_KEY", "sb_secret_test")
+
+
+def test_upsert_sends_json_params_and_dedups(supabase_env):
+    seen = {}
+
+    def handler(req):
+        seen["req"] = req
+        return httpx.Response(200, json=[{"new_hash": job().dedup_hash}])
+
+    evil = "x'); drop table jobs; --"
+    new = run_upsert(handler, [job(), job(title="Stajyer"), job(title=evil, url="https://jobs.lever.co/acme/2")])
+    req = seen["req"]
+    payload = json.loads(req.content)["payload"]
+    assert req.url.path == "/rest/v1/rpc/upsert_jobs"
+    assert len(payload) == 2                       # aynı hash tek gönderilir
+    assert payload[1]["title"] == evil             # SQL değil, düz JSON veri
+    assert req.headers["apikey"] == "sb_secret_test"
+    assert "authorization" not in req.headers      # secret key Bearer'a konmaz
+    assert new == {job().dedup_hash}
+
+
+def test_upsert_skips_network_when_empty(supabase_env):
+    assert run_upsert(lambda req: pytest.fail("no request expected"), []) == set()
+
+
+def test_upsert_refuses_plain_http(monkeypatch, supabase_env):
+    monkeypatch.setenv("SUPABASE_URL", "http://test.supabase.co")
+    with pytest.raises(ValueError):
+        run_upsert(lambda req: httpx.Response(200, json=[]), [job()])
+
+
+def test_upsert_raises_on_auth_error(supabase_env):
+    with pytest.raises(httpx.HTTPStatusError):
+        run_upsert(lambda req: httpx.Response(401, json={"message": "Invalid API key"}), [job()])
+
+
+# --- RLS: gerçek Supabase'e saldırgan gözüyle (yalnızca publishable/anon key) ---
+# Anahtarlar ortamda yoksa atlanır. RLS sağlamsa hiçbir şey yazılmaz.
+
+needs_supabase = pytest.mark.skipif(
+    not (os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_PUBLISHABLE_KEY")),
+    reason="SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY ayarlı değil",
+)
+PROBE = "0" * 64  # var olmayan test satırı: açık olsa bile gerçek veriye dokunulmaz
+PROBE_ROW = {"dedup_hash": PROBE, "source": "test", "company": "x", "title": "x", "url": "https://x.test"}
+DENIED = {401, 403, 404}
+
+
+@pytest.fixture
+def anon():
+    base = os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1"
+    with httpx.Client(base_url=base, headers={"apikey": os.environ["SUPABASE_PUBLISHABLE_KEY"]}, timeout=15) as c:
+        yield c
+
+
+@needs_supabase
+def test_anon_can_read(anon):
+    assert anon.get("/jobs", params={"select": "dedup_hash", "limit": 1}).status_code == 200
+
+
+@needs_supabase
+@pytest.mark.parametrize("method,path,kw", [
+    ("POST", "/jobs", {"json": PROBE_ROW}),
+    ("PATCH", "/jobs", {"params": {"dedup_hash": f"eq.{PROBE}"}, "json": {"title": "hacked"}}),
+    ("DELETE", "/jobs", {"params": {"dedup_hash": f"eq.{PROBE}"}}),
+    ("POST", "/rpc/upsert_jobs", {"json": {"payload": [PROBE_ROW]}}),
+])
+def test_anon_cannot_write(anon, method, path, kw):
+    # PATCH/DELETE için 204 = yetki revoke edilmemiş (yalnızca RLS koruyor) → ikinci kilit eksik
+    r = anon.request(method, path, **kw)
+    assert r.status_code in DENIED, f"RLS AÇIĞI: anon {method} {path} → {r.status_code}"
+
+
+@needs_supabase
+def test_request_without_key_rejected():
+    r = httpx.get(os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/jobs", timeout=15)
+    assert r.status_code == 401

@@ -41,20 +41,22 @@ nejatjobs/                      # Repo kökü
 │   ├── main.py                 # Pipeline orkestrasyon giriş noktası
 │   └── requirements.txt        # Minimal Python bağımlılıkları
 └── web/
-    ├── next.config.js          # HTTP güvenlik başlıkları (CSP, X-Frame-Options, nosniff)
+    ├── next.config.ts          # Sabit güvenlik başlıkları (X-Frame-Options, nosniff, Referrer/Permissions-Policy)
+    ├── tsconfig.json
     ├── src/
+    │   ├── proxy.ts            # Nonce tabanlı CSP (Next 16'da middleware'in yeni adı: proxy)
     │   ├── app/
-    │   │   ├── page.tsx        # Ana dashboard & ilan listesi
-    │   │   └── layout.tsx      # Kök layout (başlıklar burada DEĞİL, next.config.js'te)
+    │   │   ├── page.tsx        # Ana sayfa, ilan listesi & "Diğer Kaynaklar" linkleri
+    │   │   ├── layout.tsx      # Kök layout (başlıklar burada DEĞİL)
+    │   │   └── globals.css     # Düz CSS (Tailwind yerine; tek sayfa için yeterli)
     │   ├── components/
     │   │   ├── JobCard.tsx     # İlan kartı & güvenli yönlendirme (rel/XSS koruması)
-    │   │   └── Filters.tsx     # Çalışma türü / tag filtreleme
+    │   │   └── Filters.tsx     # Şirket / uzun dönem filtresi (JS'siz GET formu)
     │   └── lib/
-    │       └── supabase.ts     # Frontend Supabase client (anon key kısıtları)
+    │       └── supabase.ts     # Sunucu tarafı okuma (publishable key, fetch ile — ek kütüphane yok)
     ├── tests/
     │   └── security.test.ts    # Web & XSS / Link güvenliği testleri
-    ├── package.json            # Test aracı: Vitest
-    └── tailwind.config.ts
+    └── package.json            # Test aracı: Vitest
 ```
 
 ---

@@ -7,6 +7,8 @@ import pytest
 from pydantic import ValidationError
 
 import database
+import main
+import scraper
 from models import JobPosting, is_internship, is_long_term
 from scraper import MAX_BYTES, LeverScraper, make_client
 
@@ -227,3 +229,59 @@ def test_anon_cannot_write(anon, method, path, kw):
 def test_request_without_key_rejected():
     r = httpx.get(os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/jobs", timeout=15)
     assert r.status_code == 401
+
+
+# --- Retry / backoff ---
+
+def test_retries_transient_errors(monkeypatch):
+    monkeypatch.setattr(scraper, "RETRY_DELAY", 0)
+    calls = []
+
+    def handler(req):
+        calls.append(1)
+        return httpx.Response(503) if len(calls) < 3 else httpx.Response(200, json=[GOOD])
+
+    assert len(run_lever(handler)) == 1
+    assert len(calls) == 3
+
+
+def test_does_not_retry_client_errors(monkeypatch):
+    monkeypatch.setattr(scraper, "RETRY_DELAY", 0)
+    calls = []
+
+    def handler(req):
+        calls.append(1)
+        return httpx.Response(404)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        run_lever(handler)
+    assert len(calls) == 1
+
+
+# --- Telegram ---
+
+def test_telegram_message_is_plain_text_and_chunked():
+    evil = job(title="<b>x</b> [tıkla](https://evil.com)", is_long_term=True)
+    msgs = main.format_messages([evil] + [job(url=f"https://jobs.lever.co/acme/{i}") for i in range(200)])
+    assert "<b>x</b> [tıkla](https://evil.com)" in msgs[0]   # olduğu gibi, yorumlanmadan
+    assert msgs[0].startswith("🔥 UZUN DÖNEM")
+    assert len(msgs) > 1 and all(len(m) <= main.TELEGRAM_LIMIT for m in msgs)
+
+
+def test_telegram_error_does_not_leak_token(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:SECRET")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "@test")
+    seen = {}
+
+    def handler(req):
+        seen["body"] = json.loads(req.content)
+        return httpx.Response(401)
+
+    async def go():
+        async with make_client(httpx.MockTransport(handler)) as c:
+            await main.notify(c, [job()])
+
+    with pytest.raises(RuntimeError) as e:
+        asyncio.run(go())
+    assert "SECRET" not in str(e.value)
+    assert "parse_mode" not in seen["body"]

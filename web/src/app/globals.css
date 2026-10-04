@@ -1,0 +1,56 @@
+:root {
+  --bg: #f7f7f8;
+  --fg: #1a1a1a;
+  --muted: #666;
+  --card: #fff;
+  --border: #e3e3e6;
+  --accent: #2b59c3;
+  --badge: #e8590c;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111214;
+    --fg: #ececec;
+    --muted: #a0a0a0;
+    --card: #1b1c1f;
+    --border: #2c2d31;
+    --accent: #7ea2ff;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { margin: 0; font-size: 2rem; }
+.lead { color: var(--muted); margin-top: 4px; }
+a { color: var(--accent); }
+
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 24px 0; }
+.filters select, .filters button {
+  font: inherit; padding: 6px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--card); color: var(--fg);
+}
+.filters button { cursor: pointer; }
+
+.jobs { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.card h2 { font-size: 1.1rem; margin: 4px 0; overflow-wrap: anywhere; }
+.meta { color: var(--muted); margin: 0 0 8px; }
+.badge {
+  display: inline-block; font-size: 0.75rem; font-weight: 600; color: #fff;
+  background: var(--badge); border-radius: 999px; padding: 2px 8px;
+}
+
+.empty { color: var(--muted); padding: 24px 0; }
+.sources { margin-top: 48px; border-top: 1px solid var(--border); padding-top: 16px; }
+.sources h2 { font-size: 1.1rem; }
+.sources p { color: var(--muted); }

@@ -15,6 +15,8 @@ log = logging.getLogger(__name__)
 USER_AGENT = "nejatjobs/0.1 (+https://github.com/yonzbro/nejatjobs)"
 MAX_BYTES = 5_000_000
 SLUG = re.compile(r"^[a-z0-9-]{1,50}$")
+RETRIES = 3
+RETRY_DELAY = 2.0  # saniye: 2, 4
 
 
 def make_client(transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:
@@ -37,6 +39,20 @@ class BaseScraper(ABC):
         self.company = company
 
     async def _get_json(self, url: str, **params: str) -> Any:
+        # Geçici hatalarda (429, 5xx, ağ) üstel bekleme ile en fazla 3 deneme; 4xx tekrar denenmez
+        for attempt in range(RETRIES):
+            try:
+                return await self._get_json_once(url, **params)
+            except httpx.HTTPStatusError as e:
+                code = e.response.status_code
+                if attempt == RETRIES - 1 or (code != 429 and code < 500):
+                    raise
+            except httpx.TransportError:
+                if attempt == RETRIES - 1:
+                    raise
+            await asyncio.sleep(RETRY_DELAY * 2**attempt)
+
+    async def _get_json_once(self, url: str, **params: str) -> Any:
         async with self.client.stream("GET", url, params=params) as r:
             r.raise_for_status()  # 3xx dahil: yönlendirme takip edilmez
             body = bytearray()

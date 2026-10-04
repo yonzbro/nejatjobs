@@ -6,14 +6,46 @@ import httpx
 
 from database import upsert_jobs
 from models import JobPosting
-from scraper import LeverScraper, make_client, scrape_all
+from scraper import (
+    AshbyScraper,
+    BaseScraper,
+    GreenhouseScraper,
+    LeverScraper,
+    SmartRecruitersScraper,
+    WorkdayScraper,
+    make_client,
+    scrape_all,
+)
 
-LEVER_COMPANIES = {
-    "trendyol": "Trendyol",
-    "insiderone": "Insider One",
-    "iyzico": "iyzico",
-    "dreamgames": "Dream Games",
-}
+# Takip listesi: (kaynak, slug, görünen ad). Slug'lar şirketin ilan panosu URL'sinden alınır.
+COMPANIES = [
+    (LeverScraper, "trendyol", "Trendyol"),
+    (LeverScraper, "insiderone", "Insider One"),
+    (LeverScraper, "iyzico", "iyzico"),
+    (LeverScraper, "dreamgames", "Dream Games"),
+    (LeverScraper, "commencis", "Commencis"),
+    (LeverScraper, "loopgames", "Loop Games"),
+    (LeverScraper, "picus", "Picus Security"),
+    (GreenhouseScraper, "goodjobgames", "Good Job Games"),
+    (GreenhouseScraper, "constructortech", "Constructor"),
+    (GreenhouseScraper, "veeamsoftware", "Veeam"),
+    (AshbyScraper, "biggergames", "Bigger Games"),
+    (AshbyScraper, "voodoo", "Voodoo"),
+    (AshbyScraper, "codeway", "Codeway"),
+    (AshbyScraper, "agavegames", "Agave Games"),
+    (SmartRecruitersScraper, "boschgroup", "Bosch"),
+    (SmartRecruitersScraper, "lesaffre", "Lesaffre"),
+    (SmartRecruitersScraper, "reload1", "Reload"),
+    (SmartRecruitersScraper, "averydennison", "Avery Dennison"),
+    (SmartRecruitersScraper, "deliveryhero", "Delivery Hero"),
+]
+# Workday: (tenant, wd sunucusu, site) — kariyer sitesi URL'sinden: <tenant>.<wd>.myworkdayjobs.com/<site>
+WORKDAY = [
+    ("diageo", "wd3", "Diageo_Careers", "Diageo"),
+    ("db", "wd3", "DBWebsite", "Deutsche Bank"),
+    ("analogdevices", "wd1", "External", "Analog Devices"),
+    ("pernodricard", "wd3", "pernod-ricard", "Pernod Ricard"),
+]
 TELEGRAM_LIMIT = 4000  # Telegram mesaj sınırı 4096
 
 
@@ -45,14 +77,17 @@ async def notify(client: httpx.AsyncClient, jobs: list[JobPosting]) -> None:
 
 async def main() -> None:
     async with make_client() as client:
-        jobs = await scrape_all([LeverScraper(client, s, n) for s, n in LEVER_COMPANIES.items()])
+        scrapers: list[BaseScraper] = [cls(client, slug, name) for cls, slug, name in COMPANIES]
+        scrapers += [WorkdayScraper(client, t, name, wd, site) for t, wd, site, name in WORKDAY]
+        jobs = await scrape_all(scrapers)
         # Supabase ayarlı değilse yalnızca listeler (yerel deneme)
         new = await upsert_jobs(client, jobs) if os.environ.get("SUPABASE_URL") else set()
         await notify(client, [j for j in jobs if j.dedup_hash in new])
     for j in jobs:
         tags = ("[YENİ] " if j.dedup_hash in new else "") + ("[UZUN] " if j.is_long_term else "")
+        tags += "[MEZUN] " if j.is_new_grad else ""
         print(f"{tags}{j.company} | {j.title} | {j.url}")
-    print(f"{len(jobs)} TR staj ilanı, {len(new)} yeni")
+    print(f"{len(jobs)} TR ilanı (staj + yeni mezun), {len(new)} yeni")
 
 
 if __name__ == "__main__":

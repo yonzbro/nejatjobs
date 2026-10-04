@@ -10,20 +10,43 @@ _INVISIBLE = re.compile(r"[\x00-\x1f\x7f-\x9f​-‏‪-‮⁦-⁩]")
 _WHITESPACE = re.compile(r"\s+")
 
 INTERNSHIP = re.compile(r"\bintern(?:ship)?s?\b|\bstaj|\btrainee", re.IGNORECASE)
+NEW_GRAD = re.compile(
+    r"\b(?:new|fresh|recent)[\s-]*grad|\bgraduate\s+(?:program|programme|trainee)|management\s+trainee"
+    r"|yeni\s+mezun|aday\s+m[üu]hendis",
+    re.IGNORECASE,
+)
 # ponytail: anahtar kelime heuristic'i; kaçan kalıp görülünce buraya eklenir
 LONG_TERM = re.compile(
     r"uzun\s*d[öo]nem|long[\s-]*term|\b(?:6|9|12)[\s-]*(?:ay|months?)\b"
-    r"|part[\s-]*time|yar[ıi]\s*zamanl[ıi]|\bftc\b",
+    r"|part[\s-]*time|yar[ıi]\s*zamanl[ıi]|\bftc\b"
+    r"|smart\s+start"  # Bosch: okul döneminde haftada 3-5 gün çalışan öğrenci programı
+    r"|\b[2-5](?:\s*-\s*[2-5])?\s*days?\s*(?:a|per)\s*week|haftada\s*(?:en\s*az\s*)?[2-5]",
+    re.IGNORECASE,
+)
+TURKEY = re.compile(
+    r"\b(?:turkey|t[üu]rkiye|istanbul|ankara|izmir|bursa|kocaeli|gebze|antalya|manisa|eski[şs]ehir)\b",
     re.IGNORECASE,
 )
 
 
+def _any(pattern: re.Pattern[str], texts: tuple[str | None, ...]) -> bool:
+    return any(isinstance(t, str) and pattern.search(t) for t in texts)
+
+
 def is_internship(*texts: str | None) -> bool:
-    return any(t and INTERNSHIP.search(t) for t in texts)
+    return _any(INTERNSHIP, texts)
+
+
+def is_new_grad(*texts: str | None) -> bool:
+    return _any(NEW_GRAD, texts)
 
 
 def is_long_term(*texts: str | None) -> bool:
-    return any(t and LONG_TERM.search(t) for t in texts)
+    return _any(LONG_TERM, texts)
+
+
+def is_turkey(*texts: str | None) -> bool:
+    return _any(TURKEY, texts)
 
 
 class JobPosting(BaseModel):
@@ -37,6 +60,7 @@ class JobPosting(BaseModel):
     country: str | None = Field(default=None, pattern=r"^[A-Z]{2}$")
     posted_at: datetime | None = None
     is_long_term: bool = False
+    is_new_grad: bool = False
 
     @field_validator("company", "title", "location", mode="before")
     @classmethod

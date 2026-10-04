@@ -1,12 +1,19 @@
 // Düz HTML GET formu: JavaScript gerekmez, filtreler URL'de kalır (paylaşılabilir link)
+const KINDS = [
+  { value: "", label: "Tüm ilanlar" },
+  { value: "staj", label: "Staj" },
+  { value: "uzun", label: "Uzun dönem staj" },
+  { value: "mezun", label: "Yeni mezun" },
+] as const
+
 export default function Filters({
   companies,
   company,
-  longTerm,
+  kind,
 }: {
   companies: string[]
   company: string
-  longTerm: boolean
+  kind: string
 }) {
   return (
     <form method="get" className="filters">
@@ -18,9 +25,13 @@ export default function Filters({
           </option>
         ))}
       </select>
-      <label>
-        <input type="checkbox" name="uzun" value="1" defaultChecked={longTerm} /> Sadece uzun dönem
-      </label>
+      <select name="tur" defaultValue={kind} aria-label="İlan türü">
+        {KINDS.map((k) => (
+          <option key={k.value} value={k.value}>
+            {k.label}
+          </option>
+        ))}
+      </select>
       <button type="submit">Filtrele</button>
     </form>
   )

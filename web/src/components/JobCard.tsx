@@ -14,7 +14,11 @@ export default function JobCard({ job }: { job: Job }) {
   const href = safeHref(job.url)
   return (
     <li className="card">
-      {job.is_long_term && <span className="badge">Uzun dönem</span>}
+      {job.is_new_grad ? (
+        <span className="badge grad">Yeni mezun</span>
+      ) : (
+        job.is_long_term && <span className="badge">Uzun dönem</span>
+      )}
       {/* React metni otomatik escape eder; dangerouslySetInnerHTML kullanılmaz */}
       <h2>{job.title}</h2>
       <p className="meta">

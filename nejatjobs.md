@@ -98,7 +98,9 @@ Projeyi bağlam kaybı yaşamamak adına 5 aşamada parça parça tamamlayacağ�
 * **Faz 4:** GitHub Actions cron konfigürasyonu, secret yönetimi ve nazik scraping (rate-limit, açık User-Agent, `robots.txt` uyumu, retry/backoff). Hedef sitelerin bot korumalarını aşmaya yönelik teknikler kapsam dışıdır. Yeni bir uzun dönem staj ilanı veritabanına ilk kez girdiğinde Telegram kanalına bildirim gönderilir (bot token yalnızca GitHub Secrets'ta; bildirim fonksiyonu `main.py` içinde, ayrı dosya yok).
 
 ### Kapsam Stratejisi (ilan kaçırmamak için)
-* **Sistem (otomatik):** Şirketlerin public ATS API'leri (Lever → sonra Greenhouse, Workable, SmartRecruiters). Takip listesi büyüdükçe kapsam artar.
+* **Sistem (otomatik):** Şirketlerin public ATS API'leri: Lever, Greenhouse, Ashby, SmartRecruiters, Workday. Takip listesi (`main.py`) büyüdükçe kapsam artar.
+  * **Bilinçli istisna (2026-10-05, proje sahibinin kararı):** SmartRecruiters (`api.smartrecruiters.com` robots.txt'si botları engelliyor) ve Workday (resmi public API yok, kariyer sitesinin kendi ucu) robots/resmi API kuralının dışında tutularak eklendi. Gerekçe: yalnızca herkese açık ilanlar, günde 3 istek, açık User-Agent. Şirket veya platform itiraz ederse kaynak kaldırılır.
+  * **Kapsam:** Staj ilanlarının yanında "Aday Mühendislik" hedefine uygun olarak yeni mezun ilanları (New Grad, Fresh Grad, Management Trainee) da `is_new_grad` etiketiyle alınır.
 * **Sabit linkler (sıfır risk):** Arayüzde "Diğer Kaynaklar" bölümü; Youthall, Toptalent, anbean, Kariyer.net ve LinkedIn'in kendi staj arama sayfalarına elle yazılmış sabit linkler (`page.tsx` içinde basit bir liste, ayrı dosya yok). Bu sitelerden hiçbir veri otomatik çekilmez; izin alınırsa kaynak olarak eklenir.
 * **Platform alarmları (manuel, kodsuz):** Youthall, Toptalent, anbean, LinkedIn ve Kariyer.net'in kendi "staj / uzun dönem" ilan alarmları açılır. Bu siteleri kod ile çekmek kullanım koşullarına aykırı olduğundan bu boşluk platformların kendi bildirimleriyle kapatılır.
 * **Faz 5:** Next.js arayüzü, filtreleme paneli, güvenlik başlıkları (CSP vb.) ve Vercel dağıtımı.

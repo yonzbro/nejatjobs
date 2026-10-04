@@ -15,6 +15,9 @@ create table if not exists public.jobs (
   last_seen_at  timestamptz not null default now()  -- ilan hâlâ yayında mı? (Faz 5 filtresi)
 );
 
+-- Sonradan eklenen kolonlar (var olan tabloya da uygulanır)
+alter table public.jobs add column if not exists is_new_grad boolean not null default false;
+
 -- 2) RLS: anon (frontend) yalnızca okur. service_role RLS'i bypass eder, politika gerekmez.
 alter table public.jobs enable row level security;
 
@@ -33,15 +36,17 @@ set search_path = ''
 as $$
   with up as (
     insert into public.jobs as j
-      (dedup_hash, source, company, title, url, location, country, posted_at, is_long_term)
-    select r.dedup_hash, r.source, r.company, r.title, r.url, r.location, r.country, r.posted_at, r.is_long_term
+      (dedup_hash, source, company, title, url, location, country, posted_at, is_long_term, is_new_grad)
+    select r.dedup_hash, r.source, r.company, r.title, r.url, r.location, r.country, r.posted_at, r.is_long_term,
+           coalesce(r.is_new_grad, false)
     from jsonb_to_recordset(payload) as r(
       dedup_hash text, source text, company text, title text, url text,
-      location text, country text, posted_at timestamptz, is_long_term boolean)
+      location text, country text, posted_at timestamptz, is_long_term boolean, is_new_grad boolean)
     on conflict (dedup_hash) do update
       set title = excluded.title,
           location = excluded.location,
           is_long_term = excluded.is_long_term,
+          is_new_grad = excluded.is_new_grad,
           last_seen_at = now()
     returning j.dedup_hash, j.first_seen_at
   )

@@ -8,6 +8,7 @@ export type Job = {
   url: string
   location: string | null
   is_long_term: boolean
+  is_new_grad: boolean
   posted_at: string | null
 }
 
@@ -22,7 +23,7 @@ export async function fetchActiveJobs(): Promise<Job[]> {
   // Saate yuvarlanır: URL saat içinde aynı kalır → fetch cache'i işe yarar
   const since = new Date(Math.floor(Date.now() / HOUR) * HOUR - ACTIVE_DAYS * 24 * HOUR)
   const url = new URL("/rest/v1/jobs", base)
-  url.searchParams.set("select", "dedup_hash,company,title,url,location,is_long_term,posted_at")
+  url.searchParams.set("select", "dedup_hash,company,title,url,location,is_long_term,is_new_grad,posted_at")
   url.searchParams.set("last_seen_at", `gte.${since.toISOString()}`)
   url.searchParams.set("order", "posted_at.desc.nullslast")
 

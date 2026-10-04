@@ -9,8 +9,16 @@ from pydantic import ValidationError
 import database
 import main
 import scraper
-from models import JobPosting, is_internship, is_long_term
-from scraper import MAX_BYTES, LeverScraper, make_client
+from models import JobPosting, is_internship, is_long_term, is_new_grad, is_turkey
+from scraper import (
+    MAX_BYTES,
+    AshbyScraper,
+    GreenhouseScraper,
+    LeverScraper,
+    SmartRecruitersScraper,
+    WorkdayScraper,
+    make_client,
+)
 
 
 def job(**kw):
@@ -18,11 +26,15 @@ def job(**kw):
     return JobPosting(**(base | kw))
 
 
-def run_lever(handler):
+def run_scraper(cls, handler, *args):
     async def go():
         async with make_client(httpx.MockTransport(handler)) as c:
-            return await LeverScraper(c, "acme", "Acme").fetch()
+            return await cls(c, "acme", "Acme", *args).fetch()
     return asyncio.run(go())
+
+
+def run_lever(handler):
+    return run_scraper(LeverScraper, handler)
 
 
 # --- Model: URL ---
@@ -76,9 +88,13 @@ def test_dedup_hash_depends_on_source_and_url_only():
     ("6 Ay Stajyer", True),
     ("Part-time Intern", True),
     ("YARI ZAMANLI STAJYER", True),
+    ("Smart Start Production Engineer", True),
+    ("Ability to work 3-5 days a week", True),
+    ("haftada en az 3 gün", True),
     ("Yaz Stajı", False),
     ("Summer Intern", False),
     ("16 months", False),
+    ("7 days a week support", False),
 ])
 def test_long_term_detection(text, expected):
     assert is_long_term(text) is expected
@@ -93,6 +109,33 @@ def test_long_term_detection(text, expected):
 def test_internship_detection(text, expected):
     assert is_internship(text) is expected
 
+
+@pytest.mark.parametrize("text,expected", [
+    ("Software Engineer (New Grad)", True),
+    ("Management Trainee for People & Culture (Fresh Grad)", True),
+    ("Growth Manager - New Grad", True),
+    ("Yeni Mezun Aday Mühendis", True),
+    ("Graduate Program 2027", True),
+    ("Senior Software Engineer", False),
+    ("Postgraduate Researcher", False),
+])
+def test_new_grad_detection(text, expected):
+    assert is_new_grad(text) is expected
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("İstanbul", True),
+    ("ISTANBUL, TR", True),
+    ("Bursa, , Turkey", True),
+    ("Türkiye", True),
+    ("Turkiye - Remote", True),
+    ("Istanbul, Turkey; London", True),
+    ("Lisboa", False),
+    ("Turkmenistan", False),
+    (None, False),
+])
+def test_turkey_detection(text, expected):
+    assert is_turkey(text) is expected
 
 # --- Scraper ---
 
@@ -137,6 +180,84 @@ def test_lever_does_not_follow_redirects():
 def test_rejects_bad_slugs(slug):
     with pytest.raises(ValueError):
         LeverScraper(None, slug, "X")
+
+
+# --- Greenhouse / Ashby / SmartRecruiters / Workday ---
+
+def test_greenhouse_filters_country_kind_and_host():
+    gh = lambda title, loc, url: {"title": title, "location": {"name": loc}, "absolute_url": url}
+    ok = "https://job-boards.greenhouse.io/acme/jobs/1"
+    items = [
+        gh("Software Engineer - New Grad", "Istanbul, Turkey", ok),
+        gh("Intern", "London", ok),                                         # TR değil
+        gh("Senior Engineer", "Istanbul", ok),                              # staj / mezun değil
+        gh("Intern", "Istanbul", "https://evil.com/phish"),                 # yabancı host
+        gh("Intern", "Istanbul", "javascript:alert(1)"),
+    ]
+    jobs = run_scraper(GreenhouseScraper, lambda req: httpx.Response(200, json={"jobs": items}))
+    assert [(j.title, j.is_new_grad) for j in jobs] == [("Software Engineer - New Grad", True)]
+
+
+def test_ashby_uses_employment_type_and_skips_unlisted():
+    base = {
+        "title": "People Team", "employmentType": "Intern", "isListed": True, "location": "Istanbul",
+        "address": {"postalAddress": {"addressCountry": "Turkey"}},
+        "jobUrl": "https://jobs.ashbyhq.com/acme/1", "descriptionPlain": "Ability to work 3 days a week",
+    }
+    items = [base, base | {"isListed": False}, base | {"address": None, "location": "Paris"}]
+    jobs = run_scraper(AshbyScraper, lambda req: httpx.Response(200, json={"jobs": items}))
+    assert len(jobs) == 1 and jobs[0].is_long_term and not jobs[0].is_new_grad
+
+
+SR_ITEM = {
+    "id": "744000153116813", "name": "Smart Start BPS Method Engineer",
+    "location": {"country": "tr", "city": "Bursa"}, "releasedDate": "2026-10-02T08:08:58.066Z",
+    "experienceLevel": {"id": "internship", "label": "Internship"},
+}
+
+
+def test_smartrecruiters_builds_url_from_numeric_id_only():
+    items = [SR_ITEM, SR_ITEM | {"id": "../../evil"}, SR_ITEM | {"location": {"country": "de"}}]
+    jobs = run_scraper(SmartRecruitersScraper, lambda req: httpx.Response(200, json={"content": items}))
+    assert [str(j.url) for j in jobs] == ["https://jobs.smartrecruiters.com/acme/744000153116813"]
+    assert jobs[0].is_long_term   # başlıkta "intern" yok; staj bilgisi experienceLevel'dan gelir
+
+
+def test_smartrecruiters_paginates_with_cap(monkeypatch):
+    monkeypatch.setattr(scraper, "MAX_PAGES", 3)
+    offsets = []
+
+    def handler(req):
+        offsets.append(req.url.params["offset"])
+        assert req.url.params["country"] == "tr"
+        return httpx.Response(200, json={"content": [SR_ITEM] * SmartRecruitersScraper.PAGE})  # hep dolu sayfa
+
+    run_scraper(SmartRecruitersScraper, handler)
+    assert offsets == ["0", "100", "200"]   # sonsuz döngü yok
+
+
+def test_workday_posts_search_and_validates_path():
+    seen = []
+
+    def handler(req):
+        seen.append(req)
+        return httpx.Response(200, json={"jobPostings": [
+            {"title": "Management Trainee", "locationsText": "Istanbul", "externalPath": "/job/Istanbul/MT_1"},
+            {"title": "Intern", "locationsText": "Istanbul", "externalPath": "//evil.com/x"},
+            {"title": "Intern", "locationsText": "2 Locations", "externalPath": "/job/x/Intern_2"},
+        ]})
+
+    jobs = run_scraper(WorkdayScraper, handler, "wd3", "Careers")
+    req = seen[0]
+    assert req.method == "POST" and req.url.host == "acme.wd3.myworkdayjobs.com"
+    assert json.loads(req.content)["searchText"] == "Turkey"
+    assert [str(j.url) for j in jobs] == ["https://acme.wd3.myworkdayjobs.com/Careers/job/Istanbul/MT_1"]
+
+
+@pytest.mark.parametrize("wd,site", [("wd3.evil.com", "Careers"), ("wd3", "../admin"), ("wd3", "a/b"), ("x", "C")])
+def test_workday_rejects_bad_config(wd, site):
+    with pytest.raises(ValueError):
+        WorkdayScraper(None, "acme", "Acme", wd, site)
 
 
 # --- Veritabanı yazma ---

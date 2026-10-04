@@ -6,6 +6,7 @@
   --border: #e3e3e6;
   --accent: #2b59c3;
   --badge: #e8590c;
+  --badge-grad: #2f9e44;
   color-scheme: light dark;
 }
 
@@ -49,6 +50,7 @@ a { color: var(--accent); }
   display: inline-block; font-size: 0.75rem; font-weight: 600; color: #fff;
   background: var(--badge); border-radius: 999px; padding: 2px 8px;
 }
+.badge.grad { background: var(--badge-grad); }
 
 .empty { color: var(--muted); padding: 24px 0; }
 .sources { margin-top: 48px; border-top: 1px solid var(--border); padding-top: 16px; }

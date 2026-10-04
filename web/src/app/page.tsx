@@ -19,7 +19,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>
 export default async function Page({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams
   const company = typeof sp.company === "string" ? sp.company : ""
-  const longTerm = sp.uzun === "1"
+  const kind = typeof sp.tur === "string" ? sp.tur : ""
 
   let all: Job[] = []
   let failed = false
@@ -31,14 +31,21 @@ export default async function Page({ searchParams }: { searchParams: SearchParam
   }
 
   const companies = [...new Set(all.map((j) => j.company))].sort((a, b) => a.localeCompare(b, "tr"))
-  const jobs = all.filter((j) => (!company || j.company === company) && (!longTerm || j.is_long_term))
+  const matchesKind = (j: Job) =>
+    kind === "staj" ? !j.is_new_grad
+    : kind === "uzun" ? !j.is_new_grad && j.is_long_term
+    : kind === "mezun" ? j.is_new_grad
+    : true
+  const jobs = all.filter((j) => (!company || j.company === company) && matchesKind(j))
 
   return (
     <main>
       <h1>nejatjobs</h1>
-      <p className="lead">Türkiye&apos;deki staj ilanları — şirketlerin kendi kariyer sayfalarından, günde 3 kez.</p>
+      <p className="lead">
+        Türkiye&apos;deki staj ve yeni mezun ilanları — şirketlerin kendi kariyer sayfalarından, günde 3 kez.
+      </p>
 
-      <Filters companies={companies} company={company} longTerm={longTerm} />
+      <Filters companies={companies} company={company} kind={kind} />
 
       {failed ? (
         <p className="empty">İlanlar şu an yüklenemedi, biraz sonra tekrar deneyin.</p>

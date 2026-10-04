@@ -14,6 +14,7 @@ const job = (over: Partial<Job> = {}): Job => ({
   url: "https://jobs.lever.co/acme/1",
   location: "İstanbul",
   is_long_term: false,
+  is_new_grad: false,
   posted_at: null,
   ...over,
 })
@@ -43,6 +44,12 @@ describe("JobCard", () => {
 
   it("external link has noopener noreferrer", () => {
     expect(render(job())).toContain('rel="noopener noreferrer"')
+  })
+
+  it("labels new-grad and long-term postings", () => {
+    expect(render(job({ is_new_grad: true, is_long_term: true }))).toContain("Yeni mezun")
+    expect(render(job({ is_long_term: true }))).toContain("Uzun dönem")
+    expect(render(job())).not.toContain("badge")
   })
 
   it("renders no link for a dangerous URL", () => {

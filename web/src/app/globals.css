@@ -55,4 +55,5 @@ a { color: var(--accent); }
 .empty { color: var(--muted); padding: 24px 0; }
 .sources { margin-top: 48px; border-top: 1px solid var(--border); padding-top: 16px; }
 .sources h2 { font-size: 1.1rem; }
+.sources h3 { font-size: 1rem; margin-top: 24px; }
 .sources p { color: var(--muted); }

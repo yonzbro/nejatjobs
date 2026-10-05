@@ -12,6 +12,7 @@ import scraper
 from models import JobPosting, is_internship, is_long_term, is_new_grad, is_turkey
 from scraper import (
     MAX_BYTES,
+    AriTeknokentScraper,
     AshbyScraper,
     GreenhouseScraper,
     LeverScraper,
@@ -252,6 +253,46 @@ def test_workday_posts_search_and_validates_path():
     assert req.method == "POST" and req.url.host == "acme.wd3.myworkdayjobs.com"
     assert json.loads(req.content)["searchText"] == "Turkey"
     assert [str(j.url) for j in jobs] == ["https://acme.wd3.myworkdayjobs.com/Careers/job/Istanbul/MT_1"]
+
+
+ARI = "https://kariyer.ariteknokent.com.tr"
+
+
+def ari_card(title, href, kind="Internship"):
+    return (f'<div class="job-block-four"><div class="inner-box"><ul><li class="time">{kind}</li></ul>'
+            f'<h4><a href="{href}">{title}</a></h4><div class="location">İTÜ Teknokent</div></div></div>')
+
+
+def ari_detail(company, date):
+    return (f'<ul class="job-overview"><li>Yayınlanma Tarihi: {date}</li></ul>'
+            f'<div class="job-detail">Haftada 3 gün</div>'
+            f'<div class="company-widget"><h5 class="company-name">{company}</h5></div>').encode()
+
+
+def test_ariteknokent_parses_filters_and_never_fetches_foreign_links(monkeypatch):
+    monkeypatch.setattr(AriTeknokentScraper, "DELAY", 0)
+    today = __import__("datetime").date.today().strftime("%d/%m/%Y")
+    page1 = "".join([
+        ari_card("Stajyer &lt;script&gt;x&lt;/script&gt;", f"{ARI}/ilan/1"),
+        ari_card("Senior Developer", f"{ARI}/ilan/2", "Full Time"),       # staj değil → detay istenmez
+        ari_card("Stajyer", "https://169.254.169.254/latest"),            # portal dışı → asla istenmez
+        ari_card("Stajyer", f"{ARI}/ilan/3"),                             # eski ilan → elenir
+    ])
+    requested = []
+
+    def handler(req):
+        requested.append(str(req.url))
+        if req.url.path == "/search":
+            return httpx.Response(200, text=page1)  # her sayfa aynı: son sayfanın tekrarı gibi
+        if req.url.path == "/ilan/1":
+            return httpx.Response(200, content=ari_detail("Acme <b>A.Ş.</b>", today))
+        return httpx.Response(200, content=ari_detail("Eski", "01/01/2020"))
+
+    jobs = run_scraper(AriTeknokentScraper, handler)
+    assert [(j.title, j.company) for j in jobs] == [("Stajyer <script>x</script>", "Acme A.Ş.")]
+    assert jobs[0].is_long_term
+    assert not any("169.254" in u or "/ilan/2" in u for u in requested)
+    assert sum("/search" in u for u in requested) == 2   # tekrar eden sayfada durur
 
 
 @pytest.mark.parametrize("wd,site", [("wd3.evil.com", "Careers"), ("wd3", "../admin"), ("wd3", "a/b"), ("x", "C")])

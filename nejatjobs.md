@@ -99,6 +99,7 @@ Projeyi bağlam kaybı yaşamamak adına 5 aşamada parça parça tamamlayacağ�
 
 ### Kapsam Stratejisi (ilan kaçırmamak için)
 * **Sistem (otomatik):** Şirketlerin public ATS API'leri: Lever, Greenhouse, Ashby, SmartRecruiters, Workday. Takip listesi (`main.py`) büyüdükçe kapsam artar.
+  * **Teknoparklar:** İTÜ ARI Teknokent kariyer portalı HTML'den (BeautifulSoup) okunur; robots.txt izinli, istekler arası 1 sn bekleme, 120 günden eski ilanlar elenir (portal eski ilanları kaldırmıyor). Bot korumalı (Teknopark İstanbul), robots yasaklı (ODTÜ), girişli (Yıldız) ya da ilan listesi olmayan teknoparklar (Sakarya, Kocaeli, GTÜ, Ulutek) yalnızca link olarak verilir.
   * **Bilinçli istisna (2026-10-05, proje sahibinin kararı):** SmartRecruiters (`api.smartrecruiters.com` robots.txt'si botları engelliyor) ve Workday (resmi public API yok, kariyer sitesinin kendi ucu) robots/resmi API kuralının dışında tutularak eklendi. Gerekçe: yalnızca herkese açık ilanlar, günde 3 istek, açık User-Agent. Şirket veya platform itiraz ederse kaynak kaldırılır.
   * **Kapsam:** Staj ilanlarının yanında "Aday Mühendislik" hedefine uygun olarak yeni mezun ilanları (New Grad, Fresh Grad, Management Trainee) da `is_new_grad` etiketiyle alınır.
 * **Sabit linkler (sıfır risk):** Arayüzde "Diğer Kaynaklar" bölümü; Youthall, Toptalent, anbean, Kariyer.net ve LinkedIn'in kendi staj arama sayfalarına elle yazılmış sabit linkler (`page.tsx` içinde basit bir liste, ayrı dosya yok). Bu sitelerden hiçbir veri otomatik çekilmez; izin alınırsa kaynak olarak eklenir.

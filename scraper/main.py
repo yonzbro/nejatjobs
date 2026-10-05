@@ -7,6 +7,7 @@ import httpx
 from database import upsert_jobs
 from models import JobPosting
 from scraper import (
+    AriTeknokentScraper,
     AshbyScraper,
     BaseScraper,
     GreenhouseScraper,
@@ -38,6 +39,8 @@ COMPANIES = [
     (SmartRecruitersScraper, "reload1", "Reload"),
     (SmartRecruitersScraper, "averydennison", "Avery Dennison"),
     (SmartRecruitersScraper, "deliveryhero", "Delivery Hero"),
+    # Teknopark portalı: şirket adı her ilanın kendi sayfasından alınır; bu ad yalnızca yedek
+    (AriTeknokentScraper, "ari", "İTÜ ARI Teknokent"),
 ]
 # Workday: (tenant, wd sunucusu, site) — kariyer sitesi URL'sinden: <tenant>.<wd>.myworkdayjobs.com/<site>
 WORKDAY = [

@@ -14,6 +14,33 @@ const OTHER_SOURCES = [
   },
 ]
 
+// Otomatik çekilemeyen teknoparklar: bot koruması, robots.txt yasağı, girişli portal ya da ilan listesi yok.
+// (İTÜ ARI Teknokent otomatik çekiliyor, burada yok.)
+const TECHNOPARKS = [
+  { name: "Teknopark İstanbul", url: "https://www.teknoparkistanbul.com.tr/is-ilani/stajyer-ilanlari" },
+  { name: "ODTÜ Teknokent", url: "https://staj.metu.edu.tr/" },
+  { name: "Yıldız Teknopark", url: "https://kariyer.yildizteknopark.com.tr/" },
+  { name: "Sakarya Teknokent", url: "https://sakaryateknokent.com/is-ilanlari" },
+  { name: "Kocaeli Üniversitesi Teknopark (CV başvurusu)", url: "https://kouteknopark.com/basvuru" },
+  { name: "GTÜ Teknopark (CV başvurusu)", url: "https://gtuteknopark.com/teknopark-staj-sdud_ehooxp/" },
+  { name: "GTÜ iş ve staj duyuruları", url: "https://www.gtu.edu.tr/kategori/6001/0/display.aspx" },
+  { name: "Ulutek Teknopark", url: "https://kariyer.ulutek.com.tr/is-bul" },
+]
+
+function LinkList({ links }: { links: { name: string; url: string }[] }) {
+  return (
+    <ul>
+      {links.map((s) => (
+        <li key={s.name}>
+          <a href={s.url} target="_blank" rel="noopener noreferrer">
+            {s.name}
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 export default async function Page({ searchParams }: { searchParams: SearchParams }) {
@@ -62,15 +89,10 @@ export default async function Page({ searchParams }: { searchParams: SearchParam
       <section className="sources">
         <h2>Diğer kaynaklar</h2>
         <p>Bu sitelerdeki ilanları kaçırmamak için kendi ilan alarmlarını kurun.</p>
-        <ul>
-          {OTHER_SOURCES.map((s) => (
-            <li key={s.name}>
-              <a href={s.url} target="_blank" rel="noopener noreferrer">
-                {s.name}
-              </a>
-            </li>
-          ))}
-        </ul>
+        <LinkList links={OTHER_SOURCES} />
+        <h3>Teknoparklar</h3>
+        <p>İlanları otomatik toplanamayan teknoparkların kariyer sayfaları.</p>
+        <LinkList links={TECHNOPARKS} />
       </section>
     </main>
   )

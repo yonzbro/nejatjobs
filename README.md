@@ -47,7 +47,7 @@ Daha kapsamlı olabilirdi, ama bu haliyle **sıfır maliyetli, yasal açıdan te
 
 ## Takip edilen şirketler
 
-Trendyol · Insider One · iyzico · Dream Games · Commencis · Loop Games · Picus Security · Good Job Games · Constructor · Veeam · Bigger Games · Voodoo · Codeway · Agave Games · Bosch · Lesaffre · Reload · Avery Dennison · Delivery Hero · Diageo · Deutsche Bank · Analog Devices · Pernod Ricard · İTÜ ARI Teknokent firmaları
+Trendyol · Insider One · iyzico · Dream Games · Commencis · Loop Games · Picus Security · Good Job Games · Constructor · Veeam · Bigger Games · Voodoo · Codeway · Agave Games · Bosch · Lesaffre · Reload · Avery Dennison · Delivery Hero · Diageo · Deutsche Bank · Analog Devices · Pernod Ricard · Citi · Mastercard · P&G · Novartis · Unilever · Roche · AstraZeneca · Pfizer · Abbott · Johnson & Johnson · Philips · Coca-Cola · Mondelēz · Mars · Shell · Maersk · Thales · Intel · HP · İTÜ ARI Teknokent firmaları
 
 Yeni şirket eklemek tek satırlık iş (bkz. [Katkı](#katkı)).
 
